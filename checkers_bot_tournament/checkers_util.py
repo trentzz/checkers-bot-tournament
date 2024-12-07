@@ -2,13 +2,14 @@ from typing import overload
 
 from checkers_bot_tournament.bots.base_bot import Bot
 
-@overload
-def make_unique_bot_string(idx: int, bot: str) -> str:
-    ...
 
 @overload
-def make_unique_bot_string(bot: Bot) -> str:
-    ...
+def make_unique_bot_string(idx: int, bot: str) -> str: ...
+
+
+@overload
+def make_unique_bot_string(bot: Bot) -> str: ...
+
 
 def make_unique_bot_string(*args, **kwargs) -> str:
     """

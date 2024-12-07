@@ -1,12 +1,14 @@
-from dataclasses import dataclass
-from enum import auto, Enum
 import inspect
-from typing import Optional, Literal
+from dataclasses import dataclass
+from enum import Enum, auto
+from typing import Optional
+
 
 class Result(Enum):
     WHITE = auto()
     BLACK = auto()
     DRAW = auto()
+
 
 @dataclass
 class GameResult:
@@ -26,7 +28,7 @@ class GameResult:
     num_moves: int
     # This is quite chunky (it stores every move and board state) so it's optional
     moves: Optional[str]
-    
+
     def result_summary(self) -> str:
         match self.result:
             case Result.DRAW:
@@ -53,19 +55,19 @@ class GameResult:
         return string
 
     def white_summary(self, header: str) -> str:
-        string = (f"""{header}
+        string = f"""{header}
             Name: {self.white_name}
             Colour: White
             Kings Made: {self.white_kings_made}
-            Number of Captures: {self.white_num_captures}""")
+            Number of Captures: {self.white_num_captures}"""
         return string
-    
+
     def black_summary(self, header: str) -> str:
-        string = (f"""{header}
+        string = f"""{header}
             Name: {self.black_name}
             Colour: Black
             Kings Made: {self.black_kings_made}
-            Number of Captures: {self.black_num_captures}""")
+            Number of Captures: {self.black_num_captures}"""
         return string
 
     @property
@@ -77,7 +79,7 @@ class GameResult:
                 return self.white_name
             case Result.BLACK:
                 return self.black_name
-            
+
     @property
     def loser_name(self) -> Optional[str]:
         match self.result:

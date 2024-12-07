@@ -1,4 +1,5 @@
 import argparse
+
 from checkers_bot_tournament.controller import Controller
 
 
@@ -11,51 +12,36 @@ def main():
         type=str,
         required=True,
         choices=["one", "all"],
-        help="Mode of the game: 'one' for one bot against others, 'all' for all bots against each other."
+        help="Mode of the game: 'one' for one bot against others, 'all' for all bots against each other.",
     )
 
     parser.add_argument(
         "--bot",
         type=str,
-        help="Name or path of the bot to use (required in 'one' mode)."
+        help="Name or path of the bot to use (required in 'one' mode).",
     )
 
-    parser.add_argument(
-        "bot_list",
-        type=str,
-        nargs="+",
-        help="List of bots"
-    )
+    parser.add_argument("bot_list", type=str, nargs="+", help="List of bots")
 
     # Board size
     parser.add_argument(
-        "--size",
-        type=int,
-        default=8,
-        help="Size of the board (default: 8)."
+        "--size", type=int, default=8, help="Size of the board (default: 8)."
     )
 
     # Number of rounds
     parser.add_argument(
-        "--rounds",
-        type=int,
-        default=1,
-        help="Number of rounds to play (default: 1)."
+        "--rounds", type=int, default=1, help="Number of rounds to play (default: 1)."
     )
 
     # Verbose flag
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose output."
-    )
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output.")
 
     # Output directory
     parser.add_argument(
         "--output-dir",
         type=str,
         default=".",
-        help="Directory to save output files (default: .)."
+        help="Directory to save output files (default: .).",
     )
 
     args = parser.parse_args()

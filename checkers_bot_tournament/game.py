@@ -1,15 +1,15 @@
-from checkers_bot_tournament.bots.base_bot import Bot
-from checkers_bot_tournament.board import Board
-from checkers_bot_tournament.game_result import GameResult
-from checkers_bot_tournament.move import Move
-from checkers_bot_tournament.piece import Piece, Colour
-from checkers_bot_tournament.checkers_util import make_unique_bot_string
-from checkers_bot_tournament.game_result import Result
-
 import copy
-from typing import Optional, Literal, Tuple
+from typing import Optional, Tuple
+
+from checkers_bot_tournament.board import Board
+from checkers_bot_tournament.bots.base_bot import Bot
+from checkers_bot_tournament.checkers_util import make_unique_bot_string
+from checkers_bot_tournament.game_result import GameResult, Result
+from checkers_bot_tournament.move import Move
+from checkers_bot_tournament.piece import Colour
 
 AUTO_DRAW_MOVECOUNT = 50 * 2
+
 
 class Game:
     def __init__(
@@ -42,7 +42,7 @@ class Game:
         self.black_num_captures = 0
 
         self.game_result: Optional[GameResult] = None
-        self.moves = "" # if verbose else None
+        self.moves = ""  # if verbose else None
 
     def make_move(self) -> Tuple[Optional[Move], bool]:
         bot = self.white if self.current_turn == Colour.WHITE else self.black
@@ -63,11 +63,12 @@ class Game:
         #         return future.result(timeout=10)
         #     except TimeoutError:
         #         !!!
-        move_idx = bot.play_move(copy.deepcopy(self.board), self.current_turn, copy.copy(move_list))
+        move_idx = bot.play_move(
+            copy.deepcopy(self.board), self.current_turn, copy.copy(move_list)
+        )
         if move_idx < 0 or move_idx >= len(move_list):
             bot_string = make_unique_bot_string(bot.bot_id, bot.get_name())
-            raise RuntimeError(
-                f"bot: {bot_string} has played an invalid move")
+            raise RuntimeError(f"bot: {bot_string} has played an invalid move")
 
         move = move_list[move_idx]
         capture, promotion = self.board.move_piece(move)
@@ -120,18 +121,22 @@ class Game:
             self.swap_turn()
 
     def write_game_result(self, result: Result) -> None:
-        self.game_result = GameResult(game_id=self.game_id, game_round=self.game_round,
-                                      result=result,
-                                      white_name=make_unique_bot_string(self.white),
-                                      white_kings_made=self.white_kings_made,
-                                      white_num_captures=self.white_num_captures,
-                                      black_name=make_unique_bot_string(self.black),
-                                      black_kings_made=self.black_kings_made,
-                                      black_num_captures=self.black_num_captures,
-                                      num_moves=self.move_number, moves=self.moves)
+        self.game_result = GameResult(
+            game_id=self.game_id,
+            game_round=self.game_round,
+            result=result,
+            white_name=make_unique_bot_string(self.white),
+            white_kings_made=self.white_kings_made,
+            white_num_captures=self.white_num_captures,
+            black_name=make_unique_bot_string(self.black),
+            black_kings_made=self.black_kings_made,
+            black_num_captures=self.black_num_captures,
+            num_moves=self.move_number,
+            moves=self.moves,
+        )
 
     def get_game_result(self) -> GameResult:
-        assert(self.game_result is not None)
+        assert self.game_result is not None
         return self.game_result
 
     def swap_turn(self) -> None:

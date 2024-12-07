@@ -11,6 +11,11 @@ argparse = "^1.4.0"
 pytest = "^8.3.3"
 mypy = "^1.13.0"
 
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.2"
+poethepoet = "^0.31.1"
+coverage = "^7.6.9"
+pre-commit = "^4.0.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -18,3 +23,27 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 checkers = "checkers_bot_tournament.main:main"
+
+[tool.poe.tasks]
+_sort_imports = "ruff check --select I --fix ."
+_ruff_format = "ruff format  ."
+_ruff_check = 'ruff check .'
+_mypy = 'mypy .'
+
+format_check = 'ruff format . --check'
+fix = "ruff check --fix ."
+
+_test_all = "coverage run -m pytest ./tests"
+coverage_report = 'coverage report --omit "**/tests/**" --show-missing'
+
+[[tool.poe.tasks.format]]
+sequence = ['_sort_imports', '_ruff_format']
+ignore_fail = 'return_non_zero'
+
+[[tool.poe.tasks.check]]
+sequence = ['format_check', '_ruff_check', '_mypy']
+ignore_fail = 'return_non_zero'
+
+[[tool.poe.tasks.test]]
+sequence = ['_test_all', 'coverage_report']
+ignore_fail = 'return_non_zero'
