@@ -1,8 +1,8 @@
 import copy
-from typing import Optional, Tuple
+from typing import Optional, Tuple, overload
 
 from checkers_bot_tournament.board import Board
-from checkers_bot_tournament.bots.base_bot import Bot
+from checkers_bot_tournament.bots.bot_tracker import BotTracker
 from checkers_bot_tournament.checkers_util import make_unique_bot_string
 from checkers_bot_tournament.game_result import GameResult, Result
 from checkers_bot_tournament.move import Move
@@ -14,13 +14,13 @@ AUTO_DRAW_MOVECOUNT = 50 * 2
 class Game:
     def __init__(
         self,
-        white: Bot,
-        black: Bot,
+        white: BotTracker,
+        black: BotTracker,
         board: Board,
         game_id: int,
         game_round: int,
         verbose: bool,
-        pdn: Optional[str],
+        start_pdn: Optional[str],
     ):
         self.white = white
         self.black = black
@@ -28,7 +28,7 @@ class Game:
         self.game_id = game_id
         self.game_round = game_round
         self.verbose = verbose
-        self.pdn = pdn
+        self.pdn = start_pdn
 
         self.current_turn = Colour.WHITE
         self.move_number = 1
@@ -87,8 +87,19 @@ class Game:
             self.move_number += 1
             self.swap_turn()
 
-    def export_pdn(self, filename: str) -> None:
-        """Exports the move history to a PDN file."""
+    @overload
+    def export_pdn(self, filename: str) -> None: ...
+
+    @overload
+    def export_pdn(self) -> str: ...
+
+    def export_pdn(self, filename: Optional[str] = None) -> None | str:
+        """
+        Exports the move history to a PDN file or as a string in PDN format.
+        
+        If a filename is provided, the PDN content is written to the file.
+        If no filename is provided, the PDN content is returned as a string.
+        """
         pdn_moves = []
 
         for move in self.board.get_move_history():
@@ -102,8 +113,12 @@ class Game:
 
         pdn_content = " ".join(pdn_moves)
 
-        with open(filename, "w", encoding="utf-8") as file:
-            file.write(pdn_content)
+        if filename is not None:
+            with open(filename, "w", encoding="utf-8") as file:
+                file.write(pdn_content)
+            return None
+        else:
+            return pdn_content
 
     def _pdn_to_coordinates(self, pdn: str) -> Tuple[int, int]:
         """Converts a PDN square number to a (row, col) coordinate."""
@@ -129,16 +144,16 @@ class Game:
         removed_col = (start_col + end_col) // 2
         return removed_row, removed_col
 
-    def make_move(self) -> Tuple[Optional[Move], bool]:
-        bot = self.white if self.current_turn == Colour.WHITE else self.black
+    def make_move(self) -> Optional[Result]:
+        bot = self.white.bot if self.current_turn == Colour.WHITE else self.black.bot
         move_list: list[Move] = self.board.get_move_list(self.current_turn)
 
         if len(move_list) == 0:
             result = Result.BLACK if self.current_turn == Colour.WHITE else Result.WHITE
             # TODO: You can add extra information here (and pass it into write_game_result)
             # and GameResult as needed
-            self.write_game_result(result)
-            return (None, True)
+            # self.write_game_result(result)
+            return result
 
         # TODO: Add a futures thingo to limit each bot to 10 seconds per move or smth
         # from concurrent.futures import ThreadPoolExecutor
@@ -175,12 +190,11 @@ class Game:
 
             if self.verbose:
                 self.moves_string += f"Automatic draw by {AUTO_DRAW_MOVECOUNT/2}-move rule!\n"
-            self.write_game_result(result)
-            return move, True
+            # self.write_game_result(result)
+            return result
 
         self.move_number += 1
-
-        return move, False
+        return None
 
     def _record_capture(self) -> None:
         if self.current_turn == Colour.WHITE:
@@ -194,38 +208,37 @@ class Game:
         else:
             self.black_kings_made += 1
 
-    def run(self) -> None:
+    def run(self) -> GameResult:
         while True:
             # TODO: Implement chain moves (use is_first_move)
-            move, stop = self.make_move()
-            if move is None or stop:
+            result = self.make_move()
+            if result:
                 break
+            else:
+                self.swap_turn()
 
-            self.swap_turn()
+        return self._write_game_result(result)
 
-    def write_game_result(self, result: Result) -> None:
+    def _write_game_result(self, result: Result) -> GameResult:
         self.game_result = GameResult(
             game_id=self.game_id,
             game_round=self.game_round,
             result=result,
             white_name=make_unique_bot_string(self.white),
+            white_rating=round(self.white.rating),
             white_kings_made=self.white_kings_made,
             white_num_captures=self.white_num_captures,
             black_name=make_unique_bot_string(self.black),
+            black_rating=round(self.black.rating),
             black_kings_made=self.black_kings_made,
             black_num_captures=self.black_num_captures,
             num_moves=self.move_number,
             moves=self.moves_string,
+            moves_pdn=self.export_pdn(),
         )
-
-    def get_game_result(self) -> GameResult:
-        assert self.game_result is not None
         return self.game_result
 
     def swap_turn(self) -> None:
-        if self.current_turn == Colour.WHITE:
-            self.current_turn = Colour.BLACK
-        else:
-            self.current_turn = Colour.WHITE
+        self.current_turn = self.current_turn.get_opposite()
 
         self.is_first_move = True
