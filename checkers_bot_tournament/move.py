@@ -2,6 +2,13 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 
+# TODO: check inside board methods too (smartly and efficiently)
+class IllegalMoveException(ValueError):
+    """
+    The Move object supplied to the Board is not legal in this position.
+    """
+
+
 @dataclass(frozen=True)
 class Move:
     start: Tuple[int, int]

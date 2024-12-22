@@ -1,4 +1,4 @@
-from random import randint
+import random
 
 from checkers_bot_tournament.board import Board
 from checkers_bot_tournament.bots.base_bot import Bot
@@ -34,16 +34,18 @@ class CopyCat(Bot):
 
         return Move(mirrored_start, mirrored_end, mirrored_removed)
 
-    def play_move(self, info: PlayMoveInfo) -> int:
+    def play_move(self, info: PlayMoveInfo) -> Move:
         # If move history is empty i.e. first move, pick a random move
+        moves_list = info.move_list
+
         if not info.move_history:
-            return randint(0, len(info.move_list) - 1)
+            return random.choice(moves_list)
 
         previous_move = info.move_history[-1]
         mirror_move = self.get_mirror_move(info.board, previous_move)
 
         # Return the index of the mirrored move if it's valid, otherwise pick a random move
         if mirror_move in info.move_list:
-            return info.move_list.index(mirror_move)
+            return mirror_move
 
-        return randint(0, len(info.move_list) - 1)
+        return random.choice(moves_list)

@@ -147,3 +147,53 @@ class Board:
             )
             + "\n"
         )
+
+    def _to_bitboards(self):
+        """
+        Since there are 4 piece types + blank, this are 3 bits of information per square.
+        Note also, player to move is not required:
+
+        Although you play checkers only on the black squares, if you turn your head around,
+        it's a chessboard, in that for non-capturing moves you are going from one colour to another.
+        Your opponent moves into a 'dark' square, then you move into a 'dark square,
+        then 'light' and 'light' and so on.
+
+        That's all to say, as far as I know, there is no triangulation/way to lose a move
+        to your opponent with a king (of course, any man move is not reversible since they
+        go forwards only.) Would love to be proven wrong though!!
+
+        So we convert the board into three bitboards:
+        - white_pieces: bits set where white pieces are located
+        - black_pieces: bits set where black pieces are located
+        - kings: bits set where kings are located
+
+        Board indexing (row major):
+        index = row * size + col
+        """
+        white_pieces = 0
+        black_pieces = 0
+        kings = 0
+
+        # There are only 32 squares in a checkerboard, you can use 32 bit
+        # but oh well 64 bit integers will be tad slower
+        for r in range(self.size):
+            for c in range(self.size):
+                piece = self.grid[r][c]
+                if piece is not None:
+                    index = r * self.size + c
+                    bit = 1 << index
+                    if piece.colour == Colour.WHITE:
+                        white_pieces |= bit
+                    else:
+                        black_pieces |= bit
+                    if piece.is_king:
+                        kings |= bit
+        return white_pieces, black_pieces, kings
+
+    def __hash__(self):
+        return hash(self._to_bitboards())
+
+    def __eq__(self, other):
+        if not isinstance(other, Board):
+            return False
+        return self._to_bitboards() == other._to_bitboards()
