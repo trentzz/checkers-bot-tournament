@@ -13,7 +13,7 @@ from checkers_bot_tournament.play_move_info import PlayMoveInfo
 class MaliciousBot(Bot):
     def play_move(self, info: PlayMoveInfo) -> Move:
         # Try to submit an invalid move
-        return Move((1, 0), (4, 5), (5, 3))
+        return Move((1, 0), (4, 5), [(5, 3)])
 
     @classmethod
     def _get_name(cls):
