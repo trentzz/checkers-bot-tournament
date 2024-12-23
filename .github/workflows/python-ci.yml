@@ -4,10 +4,14 @@ on:
     branches:
       - "**/main"
       - "main"
+      - "**/add-your-bot-here"
+      - "add-your-bot-here"
   pull_request:
     branches:
       - "**/main"
       - "main"
+      - "**/add-your-bot-here"
+      - "add-your-bot-here"
 
 permissions:
   contents: read

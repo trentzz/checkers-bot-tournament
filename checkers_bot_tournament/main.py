@@ -70,7 +70,7 @@ def main():
         mode=args.mode,
         board_start_builder=args.board_start,
         pdn=args.pdn,
-        bot_name=args.bot,
+        protagonist_bot_name=args.bot,
         bot_names=args.bot_list,
         size=args.size,
         rounds=args.rounds,

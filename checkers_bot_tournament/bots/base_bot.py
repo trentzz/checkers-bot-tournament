@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import final
 
+from checkers_bot_tournament.move import Move
 from checkers_bot_tournament.play_move_info import PlayMoveInfo
 
 
@@ -9,7 +10,7 @@ class Bot(ABC):
         self.bot_id = bot_id
 
     @abstractmethod
-    def play_move(self, info: PlayMoveInfo) -> int:
+    def play_move(self, info: PlayMoveInfo) -> Move:
         """
         Params:
             info    current game info the bot has access to calculate its move.
@@ -31,6 +32,6 @@ class Bot(ABC):
     @final
     def get_name(self) -> str:
         """
-        Returns bot's name. Make sure this matches Controller!
+        Returns the bot's name through the class method.
         """
         return self.__class__._get_name()

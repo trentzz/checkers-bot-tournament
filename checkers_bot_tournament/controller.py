@@ -5,7 +5,7 @@ from datetime import datetime
 from multiprocessing import Pool
 from queue import Queue
 from threading import Thread
-from typing import IO, Dict, Optional, Type, TypeAlias
+from typing import IO, Dict, Optional, Type
 
 from checkers_bot_tournament.board import Board
 from checkers_bot_tournament.board_start_builder import (
@@ -20,7 +20,6 @@ from checkers_bot_tournament.bots.bot_tracker import BotTracker
 from checkers_bot_tournament.bots.copycat import CopyCat
 from checkers_bot_tournament.bots.first_mover import FirstMover
 from checkers_bot_tournament.bots.greedycat import GreedyCat
-from checkers_bot_tournament.bots.malicious_bot import MaliciousBot
 from checkers_bot_tournament.bots.random_bot import RandomBot
 from checkers_bot_tournament.bots.scaredycat import ScaredyCat
 from checkers_bot_tournament.checkers_util import make_unique_bot_string
@@ -51,7 +50,6 @@ class Controller:
         "ScaredyCat": ScaredyCat,
         "GreedyCat": GreedyCat,
         "CopyCat": CopyCat,
-        "MaliciousBot": MaliciousBot,
     }
 
     board_start_builder_mapping: Dict[str, Type[BoardStartBuilder]] = {
@@ -64,7 +62,7 @@ class Controller:
         mode: str,
         board_start_builder: str,
         pdn: Optional[str],
-        bot_name: Optional[str],
+        protagonist_bot_name: Optional[str],
         bot_names: list[str],
         size: int,
         rounds: int,
@@ -81,7 +79,8 @@ class Controller:
         )
 
         self.pdn = pdn
-        self.bot_name = bot_name
+        self.protagonist_bot_name = protagonist_bot_name
+        self.protagonist_tracker: Optional[BotTracker] = None
 
         self.bot_list: list[BotTracker] = self._init_bots(bot_names)
 
@@ -96,7 +95,7 @@ class Controller:
         self.game_results: list[list[GameResult]] = [[] for _ in range(rounds)]
         self.game_id_counter: int = 0
         self.game_results_folder: Optional[str] = None
-        self.write_queue: Queue[tuple[list[GameResult], int] | None] = Queue()
+        self.write_queue: Queue[Optional[tuple[list[GameResult], int]]] = Queue()
         self.writer_thread = Thread(target=self._writer_worker, daemon=True)
 
         self._init_game_schedule()
@@ -112,13 +111,15 @@ class Controller:
             raise ValueError(f"bots: {', '.join(unrecognised_bots)} entered in CLI not recognised!")
 
         idx_bot_names: list[tuple[int, str]] = [
-            (
-                idx,
-                bot_name,
-            )
-            for idx, bot_name in enumerate(bot_names)
+            (idx, bot_name) for idx, bot_name in enumerate(bot_names)
         ]
+
         unique_bot_names = list(map(lambda x: make_unique_bot_string(x[0], x[1]), idx_bot_names))
+        # If selected, player bot (idx -1) needs to be added to the list for other BotTrackers.
+        # It will actually get initialised later in _init_game_schedule()
+        if self.protagonist_bot_name:
+            unique_bot_names.append(make_unique_bot_string(-1, self.protagonist_bot_name))
+
         for idx, bot_name in idx_bot_names:
             bot_class = self.bot_mapping[bot_name]
             bot_list.append(
@@ -130,32 +131,35 @@ class Controller:
     def _init_game_schedule(self) -> None:
         match self.mode:
             case "all":
-                assert self.bot_name is None, "--player should not be set if running on all mode"
+                assert (
+                    self.protagonist_bot_name is None
+                ), "--bot [NAME] should not be set if running on all mode"
                 self._init_all_schedule()
             case "one":
-                assert self.bot_name, "--player must be set in one mode"
+                assert self.protagonist_bot_name, "--bot [NAME] must be set in one mode"
                 try:
                     # Special case: we set the bot id to -1 since the list starts at 0
                     # kinda hacky but uh :D
                     unique_bot_names = list(map(make_unique_bot_string, self.bot_list))
-                    bot_class = self.bot_mapping[self.bot_name]
-                    hero_bot = BotTracker(
+                    bot_class = self.bot_mapping[self.protagonist_bot_name]
+                    self.protagonist_tracker = BotTracker(
                         bot_class=bot_class, bot_id=-1, unique_bot_names=unique_bot_names
                     )
                 except KeyError as _:
                     raise ValueError(
-                        f"bot name {self.bot_name} entered in CLI not recognised!"
+                        f"bot name {self.protagonist_bot_name} entered in CLI not recognised!"
                     ) from _
-                self._init_one_schedule(hero_bot)
+                self._init_one_schedule(self.protagonist_tracker)
             case _:
                 raise ValueError(f"mode value {self.mode} not recognised!")
 
         if self.verbose:
             games_per_round = len(self.games[0])
             total = len(self.games[0]) * self.rounds
+            mode_str = "double-round-robin games" if self.mode == "all" else "one-vs-all games"
             print(f"{len(self.bot_list)} bots registered")
             print(
-                f"{games_per_round} double-round-robin games/tourney * {self.rounds} tourneys = {total} games scheduled"
+                f"{games_per_round} {mode_str}/tourney * {self.rounds} tourneys = {total} games scheduled"
             )
 
     def _init_all_schedule(self) -> None:
@@ -168,13 +172,13 @@ class Controller:
                     if id1 < id2:
                         self._schedule_pair_game(bot1, bot2, rnd)
 
-    def _init_one_schedule(self, hero_bot: BotTracker) -> None:
+    def _init_one_schedule(self, protagonist_bot: BotTracker) -> None:
         """
         Runs the one bot against all bots in the bot list
         """
         for rnd in range(self.rounds):
             for id2, other in enumerate(self.bot_list):
-                self._schedule_pair_game(hero_bot, other, rnd)
+                self._schedule_pair_game(protagonist_bot, other, rnd)
 
     def _schedule_pair_game(self, bot1: BotTracker, bot2: BotTracker, rnd: int) -> None:
         new_game1 = Game(
@@ -252,6 +256,8 @@ class Controller:
 
             for bot in self.bot_list:
                 bot.update_rating()
+            if self.protagonist_tracker:
+                self.protagonist_tracker.update_rating()
 
             t1 = time.time()
             if self.verbose:
@@ -287,43 +293,53 @@ class Controller:
         file.write("\n" + "=" * 40 + "\n")
 
     def _write_game_results(self, game_results: list[GameResult], round_number: int) -> None:
+        # Summary for each game
         assert self.game_results_folder is not None
-        Path: TypeAlias = str
-
-        round_folder_suffix: Path = f"round_{round_number}"
-        round_folder_path = os.path.join(self.game_results_folder, round_folder_suffix)
-        os.makedirs(round_folder_path, exist_ok=True)
-        assert round_folder_path is not None
-
         game_result_summary_path = os.path.join(self.game_results_folder, "game_result_summary.txt")
         with open(game_result_summary_path, "a", encoding="utf-8") as file:
             for game_result in game_results:
                 self._write_game_result_summary(file, game_result)
 
-                white_name = "".join(game_result.white_name.split(" ")[1:])
-                black_name = "".join(game_result.black_name.split(" ")[1:])
-                if game_result.moves:
-                    game_result_moves_path = os.path.join(
-                        round_folder_path,
-                        f"game_{game_result.game_id}_{white_name}_{black_name}.txt",
-                    )
-                    with open(game_result_moves_path, "w", encoding="utf-8") as moves_file:
-                        self._write_game_result_summary(moves_file, game_result)
-                        moves_file.write("Moves: \n")
-                        moves_file.write(game_result.moves)
+        if not (self.verbose or self.pdn):
+            # Nothing else to print out
+            return
 
-                if self.export_pdn:
-                    game_result_pdn_path = os.path.join(
-                        round_folder_path,
-                        f"game_{game_result.game_id}_{white_name}_{black_name}.pdn",
-                    )
-                    with open(game_result_pdn_path, "w") as pdn_file:
-                        pdn_file.write(game_result.moves_pdn)
+        # Move by move report for each game if verbose/PDN options selected
+        # They both go in round subfolder
+        round_subfolder_name = f"round_{round_number}"
+        round_folder_path = os.path.join(self.game_results_folder, round_subfolder_name)
+        os.makedirs(round_folder_path, exist_ok=True)
+
+        for game_result in game_results:
+            white_name = "".join(game_result.white_name.split(" ")[1:])
+            black_name = "".join(game_result.black_name.split(" ")[1:])
+
+            if self.verbose:
+                game_result_moves_path = os.path.join(
+                    round_folder_path,
+                    f"game_{game_result.game_id}_{white_name}_{black_name}.txt",
+                )
+                with open(game_result_moves_path, "w", encoding="utf-8") as moves_file:
+                    self._write_game_result_summary(moves_file, game_result)
+                    moves_file.write("Moves: \n")
+                    moves_file.write(game_result.moves)
+
+            if self.export_pdn:
+                game_result_pdn_path = os.path.join(
+                    round_folder_path,
+                    f"game_{game_result.game_id}_{white_name}_{black_name}.pdn",
+                )
+                with open(game_result_pdn_path, "w") as pdn_file:
+                    pdn_file.write(game_result.moves_pdn)
 
     def _write_tournament_results(self) -> None:
         assert self.game_results_folder is not None
         game_result_stats_path = os.path.join(self.game_results_folder, "game_result_stats.txt")
 
         with open(game_result_stats_path, "w", encoding="utf-8") as file:
-            write_tournament_overall_stats(self.bot_list, file)
-            write_tournament_h2h_stats(self.bot_list, file)
+            write_tournament_overall_stats(
+                self.bot_list, file, protagonist_tracker=self.protagonist_tracker
+            )
+            write_tournament_h2h_stats(
+                self.bot_list, file, protagonist_tracker=self.protagonist_tracker
+            )

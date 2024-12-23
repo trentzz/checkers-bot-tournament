@@ -1,11 +1,13 @@
 from math import inf
-from typing import IO
+from typing import IO, Optional
 
 from checkers_bot_tournament.bots.bot_tracker import BotTracker
 from checkers_bot_tournament.checkers_util import compute_performance_rating, make_unique_bot_string
 
 
-def write_tournament_overall_stats(bot_list: list[BotTracker], file: IO) -> None:
+def write_tournament_overall_stats(
+    bot_list: list[BotTracker], file: IO, protagonist_tracker: Optional[BotTracker] = None
+) -> None:
     """
     Writes game result statistics to a file in a structured and readable format.
 
@@ -18,12 +20,17 @@ def write_tournament_overall_stats(bot_list: list[BotTracker], file: IO) -> None
         file: The file object to write the statistics to.
         game_stats (Dict[str, GameResultStat]): A dictionary mapping bot names to their game statistics.
     """
-    file.write("Game Statistics\n")
+    protagonist_name = (
+        f" for {make_unique_bot_string(protagonist_tracker)}" if protagonist_tracker else ""
+    )
+    file.write(f"Game Statistics{protagonist_name}\n")
     file.write("=" * 60 + "\n\n")
 
     for bot in bot_list:
         stats = bot.stats
-        file.write(f"Bot Name: {make_unique_bot_string(bot)} ({round(bot.rating)})\n")
+        file.write(
+            f"{'Against ' if protagonist_tracker else ''}Bot Name: {make_unique_bot_string(bot)} ({round(bot.rating)})\n"
+        )
         file.write("-" * 60 + "\n")
 
         label_width = 10  # For "White", "Black", "Overall"
@@ -34,11 +41,19 @@ def write_tournament_overall_stats(bot_list: list[BotTracker], file: IO) -> None
         file.write(f"{'':<{label_width}}{header}\n")
 
         # Organize counts for White, Black, and Overall
-        counts = {
-            "White": (stats.white_wins, stats.white_draws, stats.white_losses),
-            "Black": (stats.black_wins, stats.black_draws, stats.black_losses),
-            "Overall": (stats.total_wins, stats.total_draws, stats.total_losses),
-        }
+        # For protagonist mode: you can just flip wins/losses & white/black
+        if not protagonist_tracker:
+            counts = {
+                "White": (stats.white_wins, stats.white_draws, stats.white_losses),
+                "Black": (stats.black_wins, stats.black_draws, stats.black_losses),
+                "Overall": (stats.total_wins, stats.total_draws, stats.total_losses),
+            }
+        else:
+            counts = {
+                "White": (stats.black_losses, stats.black_draws, stats.black_wins),
+                "Black": (stats.white_losses, stats.white_draws, stats.white_wins),
+                "Overall": (stats.total_losses, stats.total_draws, stats.total_wins),
+            }
 
         # Print absolute counts
         for label, (w, d, l) in counts.items():
@@ -74,7 +89,9 @@ def write_tournament_overall_stats(bot_list: list[BotTracker], file: IO) -> None
         file.write("=" * 60 + "\n\n")
 
 
-def write_tournament_h2h_stats(bot_list: list[BotTracker], file: IO) -> None:
+def write_tournament_h2h_stats(
+    bot_list: list[BotTracker], file: IO, protagonist_tracker: Optional[BotTracker] = None
+) -> None:
     """
     Writes head-to-head (H2H) statistics in a 2D matrix form.
 
@@ -92,6 +109,8 @@ def write_tournament_h2h_stats(bot_list: list[BotTracker], file: IO) -> None:
     # Prepare headers
     # We'll print a matrix where rows and columns are bots
     # Column headers: each opponent bot
+    if protagonist_tracker:
+        bot_list.append(protagonist_tracker)
     max_name_len = max(len(make_unique_bot_string(bot)) for bot in bot_list)
     name_col_width = max_name_len + 8  # some padding for rating
     cell_width = max(30, name_col_width)  # width for each cell to display W/D/L and PerfRating

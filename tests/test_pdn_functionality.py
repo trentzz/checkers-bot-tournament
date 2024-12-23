@@ -5,7 +5,7 @@ from checkers_bot_tournament.board_start_builder import DefaultBSB
 from checkers_bot_tournament.bots.bot_tracker import BotTracker
 from checkers_bot_tournament.bots.random_bot import RandomBot
 from checkers_bot_tournament.game import Game
-from checkers_bot_tournament.move import Move
+from checkers_bot_tournament.move import IllegalMoveException, Move
 
 
 @pytest.fixture
@@ -82,8 +82,8 @@ def test_import_pdn_black_move_first() -> None:
         assert move.removed == expected.removed
 
 
-def test_import_invalid_pdn() -> None:
-    with pytest.raises(RuntimeError):
+def test_import_invalid_pdn():
+    with pytest.raises(IllegalMoveException):
         Game(
             BotTracker(RandomBot, 0, []),
             BotTracker(RandomBot, 0, []),
@@ -134,7 +134,7 @@ def test_export_pdn(temp_pdn_file) -> None:
     ]
 
     for move in moves:
-        game.move_piece(move)
+        game.execute_move(move)
 
     # Export the moves to a file
     game.export_pdn(temp_pdn_file)
