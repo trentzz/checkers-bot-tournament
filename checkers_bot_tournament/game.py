@@ -75,6 +75,8 @@ class Game:
             pdn_content = file.read().strip()
 
         moves = pdn_content.split()  # Assumes moves are space-separated
+        # NOTE: currently don't support moves with multiple x's
+        # (whether necessary for disambiguation of chain captures or not)
 
         # Record the starting board state
         position_occurences = self.board_hashes[self.board.__hash__()]
@@ -90,7 +92,7 @@ class Game:
 
             start_pos = self._pdn_to_coordinates(start)
             end_pos = self._pdn_to_coordinates(end)
-            removed_pos = self._get_removed_position(start_pos, end_pos) if "x" in move else None
+            removed_pos = [self._get_removed_position(start_pos, end_pos)] if "x" in move else []
 
             move_obj = Move(start_pos, end_pos, removed_pos)
 
@@ -121,23 +123,28 @@ class Game:
                 )
             self.swap_turn()
 
-    def execute_move(self, move: Move, from_import: bool = False) -> Optional[Result]:
+    def execute_move(
+        self, move: Move, from_import: bool = False, play_move_info: Optional[PlayMoveInfo] = None
+    ) -> Optional[Result]:
         # Update move history
         self.move_history.append(move)
-        capture, promotion = self.board.move_piece(move)
+        captures, promotion = self.board.move_piece(move)
         position_occurences = self.board_hashes[self.board.__hash__()]
         position_occurences.append(self.move_number)
 
-        if capture or promotion:
+        if captures or promotion:
             # Reset action move, since capture or promotion occured
             self.last_action_move = self.move_number
-            if capture:
-                self._record_capture()
+            if captures:
+                self._record_capture(captures)
             if promotion:
                 self._record_promotion()
 
         if self.verbose:
-            self.moves_string += f"Move {self.move_number}: {self.current_turn}'s turn\n"
+            eval_str = ""
+            if play_move_info and play_move_info.pos_eval is not None:
+                eval_str = f". Bot's eval: {play_move_info.pos_eval:.2f}"
+            self.moves_string += f"Move {self.move_number}: {self.current_turn}'s turn{eval_str}\n"
             self.moves_string += f"Moved from {str(move.start)} to {str(move.end)}"
             if from_import:
                 self.moves_string += " (Book Move)"
@@ -238,15 +245,16 @@ class Game:
         #         return future.result(timeout=10)
         #     except TimeoutError:
         #         !!!
-        chosen_move = bot.play_move(
-            PlayMoveInfo(
-                board=copy.deepcopy(self.board),
-                colour=self.current_turn,
-                move_list=move_list.copy(),
-                move_history=self.move_history.copy(),
-                last_action_move=self.last_action_move,
-            )
+
+        info = PlayMoveInfo(
+            board=copy.deepcopy(self.board),
+            colour=self.current_turn,
+            move_list=move_list.copy(),
+            move_history=self.move_history.copy(),
+            last_action_move=self.last_action_move,
+            pos_eval=None,
         )
+        chosen_move = bot.play_move(info)
 
         if chosen_move not in move_list:
             # Offending player loses by forfeit
@@ -257,11 +265,11 @@ class Game:
         result = self.execute_move(chosen_move)
         return result
 
-    def _record_capture(self) -> None:
+    def _record_capture(self, captures: int) -> None:
         if self.current_turn == Colour.WHITE:
-            self.white_num_captures += 1
+            self.white_num_captures += captures
         else:
-            self.black_num_captures += 1
+            self.black_num_captures += captures
 
     def _record_promotion(self) -> None:
         if self.current_turn == Colour.WHITE:
@@ -311,7 +319,7 @@ class Game:
             black_num_captures=self.black_num_captures,
             num_moves=self.move_number,
             moves=self.moves_string,
-            moves_pdn=self.export_pdn(),
+            moves_pdn="",  # TODO: fix pdns for chain captures
         )
         return self.game_result
 

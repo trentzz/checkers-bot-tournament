@@ -15,7 +15,7 @@ class Board:
 
         self.grid: Grid = board_start_builder.build()
 
-    def move_piece(self, move: Move) -> Tuple[bool, bool]:
+    def move_piece(self, move: Move) -> Tuple[int, bool]:
         """
         Assume move is valid
         (i.e. in bounds, piece exists, vacant destination for normal move, or valid capturing move)
@@ -32,13 +32,13 @@ class Board:
         self.grid[end_row][end_col] = piece
         piece.position = move.end
 
-        capture = False
+        captures = 0
         promotion = False
 
         if move.removed:
-            rem_row, rem_col = move.removed
-            self.grid[rem_row][rem_col] = None
-            capture = True
+            captures = len(move.removed)
+            for rem_row, rem_col in move.removed:
+                self.grid[rem_row][rem_col] = None
 
         # Promote to king
         if (not piece.is_king) and (
@@ -48,36 +48,58 @@ class Board:
             piece.is_king = True
             promotion = True
 
-        return (capture, promotion)
+        return (captures, promotion)
 
     def add_regular_move(self, moves: list[Move], row: int, col: int, dr: int, dc: int):
         end_row, end_col = row + dr, col + dc
         if self.is_within_bounds(end_row, end_col) and self.grid[end_row][end_col] is None:
-            moves.append(Move((row, col), (end_row, end_col), None))
+            moves.append(Move((row, col), (end_row, end_col), []))
 
     def add_capture_move(
-        self, moves: list[Move], colour: Colour, row: int, col: int, dr: int, dc: int
-    ):
-        capture_row, capture_col = row + 2 * dr, col + 2 * dc
-        if not self.is_within_bounds(capture_row, capture_col):
-            return
+        self,
+        moves: list[Move],
+        colour: Colour,
+        original_row: int,
+        original_col: int,
+        directions: list[tuple[int, int]],
+    ) -> None:
+        def do_dfs(prev_captured_sqs: list[tuple[int, int]], curr_row: int, curr_col: int) -> None:
+            any_capturable = False
+            for dr, dc in directions:
+                dest_row, dest_col = curr_row + 2 * dr, curr_col + 2 * dc
+                if not self.is_within_bounds(dest_row, dest_col):
+                    continue
 
-        mid_row, mid_col = row + dr, col + dc
-        mid_piece: Optional[Piece] = self.grid[mid_row][mid_col]
-        valid_capture_move = (
-            self.grid[capture_row][capture_col] is None
-            and mid_piece is not None
-            and mid_piece.colour != colour
-        )
+                piece = self.grid[curr_row + dr][curr_col + dc]
+                if piece is None:
+                    continue
 
-        if valid_capture_move:
-            moves.append(
-                Move(
-                    (row, col),
-                    (capture_row, capture_col),
-                    (mid_row, mid_col),
+                capturable = (
+                    piece.colour is not colour
+                    and self.grid[dest_row][dest_col] is None
+                    and piece.position not in prev_captured_sqs
                 )
-            )
+
+                if capturable:
+                    prev_captured_sqs.append(piece.position)
+                    any_capturable = True
+                    do_dfs(prev_captured_sqs, dest_row, dest_col)
+                    prev_captured_sqs.pop()
+
+            if prev_captured_sqs and not any_capturable:
+                # No further captures available from this sq, so this is a
+                # leaf node: Make Move obj starting from original row/col
+                # and ending here, with all the captures of our ancestors.
+                # Since it is a list of tuples, this is a deep copy.
+                moves.append(
+                    Move(
+                        (original_row, original_col),
+                        (curr_row, curr_col),
+                        prev_captured_sqs.copy(),
+                    )
+                )
+
+        do_dfs([], original_row, original_col)
 
     def is_valid_move(self, colour: Colour, move: Move) -> bool:
         return move in self.get_move_list(colour)
@@ -98,14 +120,14 @@ class Board:
 
                     for dr, dc in directions:
                         self.add_regular_move(moves, row, col, dr, dc)
-                        self.add_capture_move(moves, colour, row, col, dr, dc)
+                    self.add_capture_move(moves, colour, row, col, directions)
 
         # Funny rule in checkers, if there is a capture move available, you MUST
         # take it, so here, if there are any capture moves, we filter to only
         # allow captures moves.
         capture_move_available = any([move.removed for move in moves])
         if capture_move_available:
-            capture_moves = list(filter(lambda move: move.removed is not None, moves))
+            capture_moves = list(filter(lambda move: move.removed, moves))
             return capture_moves
 
         # If no capture moves available, return all moves
@@ -119,30 +141,86 @@ class Board:
         row, col = position
         return self.grid[row][col] if 0 <= row < self.size and 0 <= col < self.size else None
 
-    def display_cell(self, cell: Optional[Piece], x: int, y: int) -> str:
-        if not cell:
+    def _display_cell(
+        self,
+        cell: Optional[Piece],
+        x: int,
+        y: int,
+        move: Optional[Move],
+        intermediate_sqs: list[tuple[int, int]],
+    ) -> str:
+        def get_direction(start: tuple[int, int], end: tuple[int, int]):
+            # print(intermediate_sqs, move, start, end)
+            y_start, x_start = start
+            y_end, x_end = end
+            # Remember, counting from top left
+            if (x_end - x_start) < 0:
+                if (y_end - y_start) < 0:
+                    return "↖"
+                else:
+                    return "↙"
+            else:
+                if (y_end - y_start) < 0:
+                    return "↗"
+                else:
+                    return "↘"
+
+        def get_piece(cell: Piece):
+            match (cell.colour, cell.is_king):
+                case (Colour.WHITE, False):
+                    return "w"
+                case (Colour.WHITE, True):
+                    return "W"
+                case (Colour.BLACK, False):
+                    return "b"
+                case (Colour.BLACK, True):
+                    return "B"
+                case _:
+                    raise ValueError("Unexpected piece state encountered.")
+
+        if cell is None:
             if (x + y) % 2 == 0:
                 return " "
-            else:
-                return "."
+            if not move:
+                # No information to draw enriched characters
+                return "·"
 
-        match (cell.colour, cell.is_king):
-            case (Colour.WHITE, False):
-                return "w"
-            case (Colour.WHITE, True):
-                return "W"
-            case (Colour.BLACK, False):
-                return "b"
-            case (Colour.BLACK, True):
-                return "B"
-            case _:
-                raise ValueError("Unexpected piece state encountered.")
+            if (y, x) in move.removed:
+                # A piece got captured here
+                return "⚬"
 
-    def display(self) -> str:
-        # Looks disgusting but yay pythom
+            for idx, (intermediate_sq) in enumerate(intermediate_sqs[:-1]):
+                if (y, x) == intermediate_sq:
+                    return get_direction(intermediate_sq, intermediate_sqs[idx + 1])
+
+            # Ordinary blank square
+            return "·"
+
+        # Some piece is in this square
+        if move and (y, x) == move.end:
+            # This piece moved, so underline it for clarity
+            return get_piece(cell) + "\u0332"
+        else:
+            return get_piece(cell)
+
+    def display(self, move: Optional[Move] = None) -> str:
+        """
+        Looks disgusting but yay pythom [sic]
+        Passing in a Move gives information to enrich the display of the board
+        Like arrows for starting/intermediate squares and empty circles for captures.
+        """
+
+        # For drawing arrows. It's also convenient to have the start coordinate in the list.
+        intermediate_sqs = []
+        if move:
+            intermediate_sqs = move.get_intermediate_squares()
+            intermediate_sqs.insert(0, move.start)
         return (
             "\n".join(
-                " ".join(self.display_cell(cell, x, y) for x, cell in enumerate(row))
+                " ".join(
+                    self._display_cell(cell, x, y, move, intermediate_sqs)
+                    for x, cell in enumerate(row)
+                )
                 for y, row in enumerate(self.grid)
             )
             + "\n"

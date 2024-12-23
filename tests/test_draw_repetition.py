@@ -69,21 +69,21 @@ def test_simple_shuffle() -> None:
     # the 3rd time the position where it is black to move
     # and the pieces are at b1 and w1, draw by repetition will occur.
     plan = [
-        Move(start_W, w1, None),
+        Move(start_W, w1, []),
         # b1w1 position once
-        Move(b1, b2, None),
-        Move(w1, w2, None),
-        Move(b2, b1, None),
-        Move(w2, w1, None),
+        Move(b1, b2, []),
+        Move(w1, w2, []),
+        Move(b2, b1, []),
+        Move(w2, w1, []),
         # b1w1 position twice
-        Move(b1, b2, None),
-        Move(w1, w2, None),
-        Move(b2, b1, None),
-        # Move(w2, w1, None),
+        Move(b1, b2, []),
+        Move(w1, w2, []),
+        Move(b2, b1, []),
+        # Move(w2, w1, []),
         # position thrice after this move
     ]
 
-    drawing_move = Move(w2, w1, None)
+    drawing_move = Move(w2, w1, [])
 
     # Execute the shuffle moves
     colour_to_move_ptr = [Colour.WHITE]
@@ -137,21 +137,21 @@ def test_simple_shuffle2() -> None:
     # the 3rd time the position where it is black to move
     # and the pieces are at b1 and w1, draw by repetition will occur.
     plan = [
-        Move(start_W, w1, None),
+        Move(start_W, w1, []),
         # b1w1 position once
-        Move(b1, b2, None),
-        Move(w1, w2, None),
-        Move(b2, b1, None),
-        Move(w2, w1, None),
+        Move(b1, b2, []),
+        Move(w1, w2, []),
+        Move(b2, b1, []),
+        Move(w2, w1, []),
         # b1w1 position twice
-        Move(b1, b2, None),
-        Move(w1, w0, None),
-        Move(b2, b1, None),
-        # Move(w0, w1, None),
+        Move(b1, b2, []),
+        Move(w1, w0, []),
+        Move(b2, b1, []),
+        # Move(w0, w1, []),
         # position thrice after this move
     ]
 
-    drawing_move = Move(w0, w1, None)
+    drawing_move = Move(w0, w1, [])
 
     # Execute the shuffle moves
     colour_to_move_ptr = [Colour.WHITE]
@@ -208,23 +208,23 @@ def test_simple_shuffle3() -> None:
     # and the pieces are at b1 and w1, draw by repetition will occur.
 
     plan = [
-        Move(start_W, wX, None),  # 1 White: wY -> wX
-        Move(start_B, b2, None),  # 2 Black: b1 -> b2
-        Move(wX, w0, None),  # 3 White: wX -> w0
-        Move(b2, b1, None),  # 4 Black: b2 -> b1
-        Move(w0, w1, None),  # 5
+        Move(start_W, wX, []),  # 1 White: wY -> wX
+        Move(start_B, b2, []),  # 2 Black: b1 -> b2
+        Move(wX, w0, []),  # 3 White: wX -> w0
+        Move(b2, b1, []),  # 4 Black: b2 -> b1
+        Move(w0, w1, []),  # 5
         # b1w1 position once
-        Move(b1, b2, None),  # 6
-        Move(w1, w2, None),  # 7
-        Move(b2, b1, None),  # 8
-        Move(w2, w1, None),  # 9
+        Move(b1, b2, []),  # 6
+        Move(w1, w2, []),  # 7
+        Move(b2, b1, []),  # 8
+        Move(w2, w1, []),  # 9
         # b1w1 position twice
-        Move(b1, b2, None),  # 10
-        Move(w1, w2, None),  # 11
-        Move(b2, b1, None),  # 12
+        Move(b1, b2, []),  # 10
+        Move(w1, w2, []),  # 11
+        Move(b2, b1, []),  # 12
     ]
 
-    drawing_move = Move(w2, w1, None)
+    drawing_move = Move(w2, w1, [])
 
     # Execute the shuffle moves
     colour_to_move_ptr = [Colour.WHITE]

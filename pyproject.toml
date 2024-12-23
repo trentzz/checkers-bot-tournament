@@ -16,6 +16,7 @@ ruff = "^0.8.2"
 poethepoet = "^0.31.1"
 coverage = "^7.6.9"
 pre-commit = "^4.0.1"
+snakeviz = "^2.2.2"
 
 [build-system]
 requires = ["poetry-core"]

@@ -24,6 +24,6 @@ class Colour(Enum):
 
 @dataclass
 class Piece:
-    position: Tuple[int, int]
+    position: Tuple[int, int]  # row, col from top left
     colour: Colour
     is_king: bool = False

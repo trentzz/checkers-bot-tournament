@@ -170,7 +170,7 @@ Not an exhaustive list:
 - If you have the option of capturing a piece, you're forced to (the `move_list` will only contain captures if a capture is available)
 - Conditions for a draw are:
   - Repeating the exact position 3 times
-  - 50 Moves without a capture or crowning
+  - 40 Moves without a capture or crowning
 
 ## Stuff and things
 
